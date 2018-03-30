@@ -1,0 +1,195 @@
+#1. Clean data environment:
+
+rm(list=ls())
+library(DBI)
+library(RMySQL)
+
+#2. Download the data from MySQL server into R environment by using the following SQL command:
+
+myhost <- "localhost"
+mydb <- "studb"
+myacct <- "cis434"
+mypwd <- "LLhtFPbdwiJans8F" 
+driver <- dbDriver("MySQL")
+conn <- dbConnect(driver, host=myhost, dbname=mydb, myacct, mypwd)
+softdrink <- dbGetQuery(conn, 
+                        "SELECT brand, MONTH(date) AS month, DATEDIFF(date, '2011-01-01') AS day,
+                        DAYOFWEEK(date) AS dayofweek, type, photo, video, link, hashtag, likes, comments, shares
+                        FROM softdrink WHERE brand='cocacola' OR brand='drpepper' OR brand='pepsi'")
+dbDisconnect(conn)
+
+#3. Create factors for the variables brand, type, dayofweek, and month.
+
+softdrink$brand <- as.factor(softdrink$brand)
+softdrink$type <- as.factor(softdrink$type)
+softdrink$dayofweek <- as.factor(softdrink$dayofweek)
+softdrink$month <- as.factor(softdrink$month)
+
+#4. Refer to doctors.R and plot the following bar charts
+#4a) Plot a bar chart showing the number of Facebook posts with or without photos, for all three brands.
+
+dfp <- data.frame(record = as.character("with"), aggregate(photo~brand, data = softdrink[softdrink$photo == 1,], FUN = length))
+dfnp <- data.frame(record = as.character("without"), aggregate(photo~brand, data = softdrink[softdrink$photo == 0,], FUN = length))
+dfnpn <- rbind(dfp, dfnp)
+
+library(ggplot2)
+ggplot(dfnpn, aes(brand, photo)) + 
+    geom_bar(aes(fill = record), stat = 'identity', position = 'dodge') + theme(text = element_text(size = 10))+
+    labs(title= "The number of facebook posts with or without photos")+
+    scale_fill_manual(values = c('lightblue','lightpink'))
+
+#4b) Plot a bar chart showing the number of Facebook posts with or without videos, for all three brands.
+
+dfv <- data.frame(record = as.character("with"), aggregate(video~brand, data = softdrink[softdrink$video == 1,], FUN = length))
+dfv <- rbind(c(as.character("with"),as.character("cocacola"),as.numeric("0")), dfv)
+dfnv <- data.frame(record = as.character("without"), aggregate(video~brand, data = softdrink[softdrink$video == 0,], FUN = length))
+dfnvn <- rbind(dfv, dfnv)
+dfnvn$video <- as.numeric(dfnvn$video)
+
+ggplot(dfnvn,aes(brand, video, fill = record)) + 
+    geom_bar(stat = 'identity', position = 'dodge') + theme(text = element_text(size = 10))+
+    labs(title= "The number of facebook posts with or without videos") +
+    scale_fill_manual(values = c('lightblue','lightpink'))
+
+#4c) Plot a bar chart showing the percentage of Facebook posts with or without links, for all three brands.
+
+dfl <- data.frame(record = as.character("with"), aggregate(link~brand, data = softdrink[softdrink$link == 1,], FUN = length))
+dfnl <- data.frame(record = as.character("without"), aggregate(link~brand, data = softdrink[softdrink$link == 0,], FUN = length))
+dfnln <- rbind(dfl, dfnl)
+subco <- dfnln[dfnln$brand == "cocacola", ]
+subdr <- dfnln[dfnln$brand == "drpepper", ]
+subpe <- dfnln[dfnln$brand == "pepsi", ]
+subco$percentage <- round((subco$link/sum(subco$link)),4)*100
+subdr$percentage <- round((subdr$link/sum(subdr$link)),4)*100
+subpe$percentage <- round((subpe$link/sum(subpe$link)),4)*100
+dfnln <- rbind(subco,subdr,subpe)
+
+ggplot(dfnln,aes(brand, percentage, fill = record)) + 
+    geom_bar(stat = 'identity', position = 'dodge') + theme(text = element_text(size = 10))+
+    labs(title= "The percentage of facebook posts with or without links") +
+    scale_fill_manual(values = c('lightblue','lightpink'))+
+    geom_text(aes(label = paste(dfnln$percentage, "%")))
+
+
+#4d) Plot a bar chart showing the percentage of Facebook posts with or without hashtags, for all three brands.
+
+dfh <- data.frame(record = as.character("with"), aggregate(hashtag~brand, data = softdrink[softdrink$hashtag == 1,], FUN = length))
+dfnh <- data.frame(record = as.character("without"), aggregate(hashtag~brand, data = softdrink[softdrink$hashtag == 0,], FUN = length))
+dfnhn <- rbind(dfh, dfnh)
+subco <- dfnhn[dfnhn$brand == "cocacola", ]
+subdr <- dfnhn[dfnhn$brand == "drpepper", ]
+subpe <- dfnhn[dfnhn$brand == "pepsi", ]
+subco$percentage <- round((subco$hashtag/sum(subco$hashtag)),4)*100
+subdr$percentage <- round((subdr$hashtag/sum(subdr$hashtag)),4)*100
+subpe$percentage <- round((subpe$hashtag/sum(subpe$hashtag)),4)*100
+dfnhn <- rbind(subco,subdr,subpe)
+
+ggplot(dfnhn,aes(brand, percentage, fill = record))+ 
+    geom_bar(stat = 'identity', position = 'dodge') + theme(text = element_text(size = 10))+
+    labs(title= "The percentage of facebook posts with or without links") +
+    scale_fill_manual(values = c('lightblue','lightpink'))+
+    geom_text(aes(label = paste(dfnhn$percentage, "%")))
+
+#4e) Plot 3 bar charts to show the distribution (i.e., percentage) of Facebook posts over days of week 
+#    (i.e., Monday, Tuesday. Sunday), one for each of the three brands.
+
+dayco <- aggregate(type~dayofweek, data = softdrink[softdrink$brand == "cocacola",], FUN = length)
+daydr <- aggregate(type~dayofweek, data = softdrink[softdrink$brand == "drpepper",], FUN = length)
+daype <- aggregate(type~dayofweek, data = softdrink[softdrink$brand == "pepsi",], FUN = length)
+
+dayco$percentage <- round((dayco$type/sum(dayco$type)),4)*100
+daydr$percentage <- round((daydr$type/sum(daydr$type)),4)*100
+daype$percentage <- round((daype$type/sum(daype$type)),4)*100
+
+#for Cocacola:
+ggplot(dayco,aes(dayofweek, percentage))+ 
+    geom_bar(width = 0.6, stat = 'identity', position = 'dodge', fill = "pink") + theme(text = element_text(size = 10))+
+    labs(title= "Percentage of Facebook posts over day of week for Cocacola") +
+    geom_text(aes(label = paste(dayco$percentage, "%")))
+#for Drpepper:
+ggplot(daydr,aes(dayofweek, percentage))+ 
+    geom_bar(width = 0.6, stat = 'identity', position = 'dodge', fill = "lightblue") + theme(text = element_text(size = 10))+
+    labs(title= "Percentage of Facebook posts over day of week for Drpepper", ylab = "% of Facebook Posts") +
+    geom_text(aes(label = paste(daydr$percentage, "%")))
+#for Pepsi:
+ggplot(daype,aes(dayofweek, percentage))+ 
+    geom_bar(width = 0.6, stat = 'identity', position = 'dodge', fill = "khaki1") + theme(text = element_text(size = 10))+
+    labs(title= "Percentage of Facebook posts over day of week for Pepsi", ylab = "% of Facebook Posts") +
+    geom_text(aes(label = paste(daype$percentage, "%")))
+
+
+#5. Plot 3 pie charts to show the composition of different types of posts (i.e., posts, survey, and quiz), one for each of the three brands.
+
+postco <- aggregate(hashtag~type, data = softdrink[softdrink$brand == "cocacola",], FUN = length)
+postdr <- aggregate(hashtag~type, data = softdrink[softdrink$brand == "drpepper",], FUN = length)
+postpe <- aggregate(hashtag~type, data = softdrink[softdrink$brand == "pepsi",], FUN = length)
+
+postco$percentage <- round((postco$hashtag/sum(postco$hashtag)),4)*100
+postdr$percentage <- round((postdr$hashtag/sum(postdr$hashtag)),4)*100
+postpe$percentage <- round((postpe$hashtag/sum(postpe$hashtag)),4)*100
+
+#Plot the chart.
+#For Cocacola:
+library("RColorBrewer")
+postco <- postco[order(postco[,3],decreasing=T),]
+pie(postco$percentage,paste(postco$percentage,"%",sep = ""), 
+    main="Pie Chart of different types of posts for Cocacola",
+    col = brewer.pal(3, "Blues"), border = NA)
+legend("topright", c("posts","survey","quiz"), cex = 1, fill= brewer.pal(3, "Blues"))
+
+#for Drpepper:
+postdr <- postdr[order(postdr[,3],decreasing=T),]
+pie(postdr$percentage,paste(postdr$percentage,"%",sep = ""), 
+    main="Pie Chart of different types of posts for Drpepper",
+    col = brewer.pal(3, "Greens"), border = NA)
+legend("topright", c("posts","survey","quiz"), cex = 1, fill= brewer.pal(3, "Greens"))
+
+
+
+#for Pepsi:
+postpe <- postpe[order(postpe[,3],decreasing=T),]
+pie(postpe$percentage,paste(postpe$percentage,"%",sep = ""), 
+    main="Pie Chart of different types of posts for Pepsi",
+    col = brewer.pal(3, "Reds"), border = NA)
+legend("topright", c("posts","survey","quiz"), cex = 1, fill= brewer.pal(3, "Reds"))
+
+#6. Compare the performance of the three brands using summary statistics of the number of
+#likes, the number of comments, and the number of shares for each brand.
+aggregate(likes~brand, data = softdrink, FUN = sum)
+#bar plot for sum of likes in different types of posts for each brand.
+dflikes <- aggregate(likes~brand+type, data = softdrink, FUN = sum)
+ggplot(dflikes, aes(brand, likes)) + 
+    geom_bar(width = 0.6, aes(fill = type), stat = 'identity', position = 'dodge') + theme(text = element_text(size = 10))+
+    labs(title= "The sum of facebook posts with likes in different types of posts", y = "numbers of likes")+
+    scale_fill_manual(values = c('lightblue','lightpink','yellow'))
+
+#bar plot for percentage of likes in different types of posts for each brand.
+likespost <- dflikes[dflikes$type == "post",]
+likesquiz <- dflikes[dflikes$type == "quiz",]
+likessurvey <- dflikes[dflikes$type == "survey",]
+
+likespost$percentage <- round((likespost$likes/sum(likespost$likes)),4)*100
+likesquiz $percentage <- round((likesquiz$likes/sum(likesquiz$likes)),4)*100
+likessurvey$percentage <- round((likessurvey$likes/sum(likessurvey$likes)),4)*100
+
+dflikes <- rbind(likespost, likesquiz, likessurvey)
+
+ggplot(dflikes, aes(brand, percentage)) + 
+    geom_bar(width = 0.6, aes(fill = type), stat = 'identity', position = 'dodge') + theme(text = element_text(size = 10))+
+    labs(title= "The percentage of facebook posts with likes in different types of posts", y = "percentage of likes")+
+    scale_fill_manual(values = c('lightblue','lightpink','yellow'))
+
+#pie plot for percentage of likes in different types of posts for each brand.
+likespost <- likespost[order(likespost[,3],decreasing=T),]
+pie(likespost$percentage,paste(likespost$percentage,"%",sep = ""), 
+    main="Pie Chart of composition of posts in three brands",
+    col = brewer.pal(3, "Greens"), border = NA)
+legend("topright", c("drpepper","pepsi","cocacola"), cex = 1, fill= brewer.pal(3, "Greens"))
+
+aggregate(comments~brand, data = softdrink, FUN = sum)
+aggregate(shares~brand, data = softdrink, FUN = sum)
+
+#7. Use linear regression to study how different factors are associated with the number of
+#likes/comments/shares a Facebook post can accumulate. What can you say about the relative performance of each brand?
+lm1 <- lm(likes~factor(brand)+factor(dayofweek)+factor(photo)+factor(video)+factor(link)+factor(hashtag), data = softdrink)
+summary(lm1)
